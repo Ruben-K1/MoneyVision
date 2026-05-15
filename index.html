@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MoneyVision</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d0d14;color:#eeeef8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+#app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:80px;}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+    background:#14141f;border-top:1px solid #2a2a40;display:flex;
+    justify-content:space-around;padding:8px 0 18px;z-index:50;}
+.nb{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:3px;padding:2px 10px;color:#44445a;font-size:10px;font-family:inherit;}
+.nb.on{color:#f0c060;}
+.nb .ni{font-size:22px;}
+.card{background:#1c1c2e;border:1px solid #2a2a40;border-radius:18px;padding:18px;margin-bottom:12px;}
+.btn{display:block;border:none;border-radius:14px;padding:13px 18px;font-weight:800;
+     font-size:15px;cursor:pointer;width:100%;font-family:inherit;}
+.ba{background:#f0c060;color:#0d0d14;}
+.bp{background:#1e1e30;color:#8888aa;border:1px solid #2a2a40;}
+.bg{background:#3ecf8e;color:#0d0d14;}
+.inp{width:100%;background:#14141f;border:1px solid #2a2a40;border-radius:12px;
+     padding:12px 14px;color:#eeeef8;font-size:14px;outline:none;font-family:inherit;margin-bottom:8px;}
+.inp:focus{border-color:#f0c060;}
+.lbl{font-size:11px;font-weight:700;color:#8888aa;letter-spacing:1px;margin-bottom:8px;display:block;}
+.bar-w{height:6px;background:#2a2a40;border-radius:6px;overflow:hidden;}
+.bar-i{height:100%;border-radius:6px;transition:width .4s;}
+.ov{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+    height:100vh;background:#0d0d14;z-index:100;overflow-y:auto;display:none;}
+.ov.open{display:block;}
+.coach-ov{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+          height:100vh;background:#0d0d14;z-index:100;display:none;flex-direction:column;}
+.coach-ov.open{display:flex;}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.hov{cursor:pointer;}
+.hov:active{opacity:.75;}
+.buser{padding:12px 16px;border-radius:18px 18px 4px 18px;max-width:78%;font-size:14px;
+       line-height:1.6;background:#f0c060;color:#0d0d14;font-weight:600;align-self:flex-end;}
+.bai{border-radius:18px 18px 18px 4px;padding:12px 16px;max-width:78%;font-size:14px;
+     line-height:1.6;background:#1c1c2e;border:1px solid #2a2a40;color:#eeeef8;
+     white-space:pre-wrap;align-self:flex-start;}
+.dot{width:7px;height:7px;background:#44445a;border-radius:50%;animation:bn 1s infinite;}
+@keyframes bn{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fi .2s ease;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav id="nav"></nav>
+<div class="ov" id="lsov"></div>
+<div class="ov" id="catov"></div>
+<div class="coach-ov" id="cov"></div>
+<script>
+// --- Storage ---
+var DB={
+  g:function(k,d){try{var v=localStorage.getItem(k);return v!=null?JSON.parse(v):d;}catch(e){return d;}},
+  s:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+};
+
+// --- Colors ---
+var A='#f0c060',G='#3ecf8e',B='#5b8fff',R='#ff6b6b',P='#b87fff',O='#ff9f5b',T='#5be8c8';
+var MONTHS=["Januar","Februar","M\u00e4rz","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+var CATCOL={"Grundlagen":A,"Sparen":G,"Investieren":B,"Schulden":R,"Immobilien":P,"Vorsorge":O,"Steuern":T};
+
+// --- Courses (compact) ---
+var CRS=[
+  {id:1,ic:"\uD83D\uDCB0",ti:"Was ist ein Budget?",min:5,xp:50,cat:"Grundlagen",acc:A,
+   sl:["Ein Budget ist dein finanzieller Fahrplan. Es zeigt dir genau, wie viel Geld reinkommt und rausgeht.",
+       {tip:"50-30-20 Regel: 50% f\u00fcr Notwendiges, 30% f\u00fcr W\u00fcnsche, 20% Sparen."}],
+   q:{q:"Was empfiehlt die 50-30-20 Regel zu sparen?",o:["5%","10%","20%","30%"],a:2}},
+  {id:2,ic:"\uD83D\uDD04",ti:"Automatisch sparen",min:6,xp:55,cat:"Grundlagen",acc:A,
+   sl:["Automatisches Sparen nimmt dir die Entscheidung ab. Das Geld verschwindet bevor du es ausgeben kannst.",
+       {tip:"'Pay yourself first': Am Zahltag sofort den Sparbetrag \u00fcberweisen."}],
+   q:{q:"Wann sparst du am besten?",o:["Monatsende","Wenn Lust","Direkt am Zahltag","Nur bei Bonus"],a:2}},
+  {id:3,ic:"\uD83D\uDCC9",ti:"Inflation verstehen",min:7,xp:70,cat:"Grundlagen",acc:A,
+   sl:["Bei 3% Inflation kosten Waren in 10 Jahren 34% mehr. 10.000\u20AC verlieren real an Wert.",
+       {tip:"ETFs erzielen langfristig 5-8% Rendite \u2013 deutlich mehr als die Inflation."},
+       "Tagesgeld sch\u00fctzt teilweise, aber langfristig schl\u00e4gt nur der Kapitalmarkt die Inflation."],
+   q:{q:"Was sind 10.000\u20AC bei 3% Inflation nach 10 Jahren real wert?",o:["10.000\u20AC","8.500\u20AC","~7.400\u20AC","5.000\u20AC"],a:2}},
+  {id:4,ic:"\uD83D\uDCBC",ti:"Brutto vs. Netto",min:8,xp:65,cat:"Grundlagen",acc:A,
+   sl:["Zwischen Brutto und Netto liegen Steuern und Sozialabgaben \u2013 insgesamt 35-45%.",
+       {tip:"Faustregel: Bei 3.000\u20AC Brutto bleiben ca. 1.900\u20132.100\u20AC netto."}],
+   q:{q:"Womit planst du dein Budget?",o:["Bruttogehalt","Nettogehalt","Durchschnitt","Brutto - 30%"],a:1}},
+  {id:5,ic:"\uD83D\uDD22",ti:"Der Zinseszins",min:8,xp:85,cat:"Grundlagen",acc:A,
+   sl:["10.000\u20AC bei 7% p.a.: Nach 10 Jahren 19.672\u20AC, nach 30 Jahren 76.123\u20AC.",
+       {tip:"Regel der 72: 72 \u00f7 Zinssatz = Jahre bis zur Verdopplung. Bei 7%: ca. 10 Jahre."},
+       "Wer mit 25 statt 35 anf\u00e4ngt, hat bei Renteneintritt oft doppelt so viel."],
+   q:{q:"Jahre bis zur Verdopplung bei 8% (Regel der 72)?",o:["4","9","16","24"],a:1}},
+  {id:6,ic:"\uD83C\uDFE6",ti:"Notgroschen aufbauen",min:7,xp:75,cat:"Sparen",acc:G,
+   sl:["Der Notgroschen ist das Fundament jeder Finanzstrategie. Er sch\u00fctzt bei Jobverlust oder Unf\u00e4llen.",
+       {tip:"Ziel: 3\u20136 Monatsgehalt auf einem separaten Tagesgeldkonto."},
+       "Fang klein an \u2013 25\u201350\u20AC pro Monat reichen f\u00fcr den Anfang."],
+   q:{q:"Optimale H\u00f6he des Notgroschens?",o:["1 Monatsgehalt","3\u20136 Monatsgehalt","10 Monatsgehalt","2 Jahresgehalt"],a:1}},
+  {id:7,ic:"\uD83C\uDFAF",ti:"Sparziele \u2013 SMART",min:6,xp:60,cat:"Sparen",acc:G,
+   sl:["'Ich spare mehr' scheitert. 'Ich spare bis Dezember 2.500\u20AC \u2013 250\u20AC/Monat' funktioniert.",
+       {tip:"SMART: Spezifisch, Messbar, Attraktiv, Realistisch, Terminiert."}],
+   q:{q:"Was macht ein SMART-Ziel aus?",o:["Sehr ehrgeizig","Konkrete Summe und Deadline","Geheim halten","Je gr\u00f6\u00dfer desto besser"],a:1}},
+  {id:8,ic:"\uD83E\uDDE0",ti:"Psychologie des Geldes",min:9,xp:85,cat:"Sparen",acc:G,
+   sl:["'Hedonische Adaption': Nach jedem Kauf kehren wir zum alten Gl\u00fccksniveau zur\u00fcck.",
+       {tip:"Warte bei gro\u00dfen K\u00e4ufen 48\u201372 Stunden. Fast 40% der Impulsk\u00e4ufe werden nicht get\u00e4tigt."}],
+   q:{q:"Was beschreibt Hedonische Adaption?",o:["Mehr Geld = mehr Gl\u00fcck","Kaufkraft steigt","Wir kehren nach K\u00e4ufen zum alten Gl\u00fcck zur\u00fcck","Reiche gl\u00fccklicher"],a:2}},
+  {id:9,ic:"\uD83D\uDCC8",ti:"Investieren f\u00fcr Anf\u00e4nger",min:10,xp:100,cat:"Investieren",acc:B,
+   sl:["200\u20AC/Monat, 7% Rendite: Nach 30 Jahren ca. 227.000\u20AC. Selbst gespart: nur 72.000\u20AC.",
+       {tip:"Erst Notgroschen, dann investieren. Nie Geld anlegen, das du in 5 Jahren brauchst."}],
+   q:{q:"Wichtigste Voraussetzung vor dem Investieren?",o:["Finanznachrichten lesen","Notgroschen haben","Finanzberater","1.000\u20AC/Monat"],a:1}},
+  {id:10,ic:"\uD83D\uDCCA",ti:"Aktien verstehen",min:10,xp:100,cat:"Investieren",acc:B,
+   sl:["Aktie = Anteil an einem Unternehmen. Kursgewinne + Dividenden, aber auch Verlustrisiko.",
+       {tip:"Diversifikation: Nie alles auf eine Aktie. 'Zeit im Markt' schl\u00e4gt 'Timing' fast immer."},
+       "Historisch: 7\u201310% p.a. Rendite \u00fcber alle Krisen hinweg."],
+   q:{q:"Was bedeutet 'Zeit im Markt schl\u00e4gt Timing'?",o:["Zum richtigen Zeitpunkt kaufen","Langfristig besser als perfekten Einstieg","Vorteile im Alter","Zu komplex"],a:1}},
+  {id:11,ic:"\uD83C\uDF0D",ti:"ETFs im Detail",min:10,xp:100,cat:"Investieren",acc:B,
+   sl:["ETF = Korb aus vielen Aktien. MSCI World: 1.500+ Unternehmen aus 23 L\u00e4ndern.",
+       {tip:"TER unter 0,3%, Fondsgr\u00f6\u00dfe \u00fcber 500 Mio.\u20AC, physisch repliziert, thesaurierend."},
+       "Einsteiger: iShares Core MSCI World, Vanguard FTSE All-World."],
+   q:{q:"Was bedeutet TER bei ETFs?",o:["Total Exit Return","Total Expense Ratio \u2013 j\u00e4hrl. Kosten","Tax Exemption Rate","The Exchange Rating"],a:1}},
+  {id:12,ic:"\uD83D\uDE80",ti:"Finanzielle Freiheit \u2013 FIRE",min:10,xp:120,cat:"Investieren",acc:B,
+   sl:["FIRE = Financial Independence, Retire Early. Passives Einkommen deckt alle Ausgaben.",
+       {tip:"4%-Regel: 25-fache Jahresausgaben = finanziell frei. 30.000\u20AC/Jahr = 750.000\u20AC Depot."},
+       "Sparquote 30\u201370% entscheidet die Geschwindigkeit."],
+   q:{q:"Depot bei 24.000\u20AC Jahresausgaben (4%-Regel)?",o:["240.000\u20AC","400.000\u20AC","600.000\u20AC","1.000.000\u20AC"],a:2}},
+  {id:13,ic:"\uD83D\uDCB3",ti:"Schulden abbauen",min:8,xp:80,cat:"Schulden",acc:R,
+   sl:["Schneeball: Kleinste Schuld zuerst. Lawine: H\u00f6chster Zinssatz zuerst \u2013 mathematisch g\u00fcnstiger.",
+       {tip:"Beide Methoden funktionieren. Wichtig: Eine w\u00e4hlen und konsequent durchhalten."}],
+   q:{q:"Welche Methode spart am meisten Zinsen?",o:["Schneeball","Lawine/Avalanche","Alle gleichzeitig","Erst sparen"],a:1}},
+  {id:14,ic:"\uD83E\uDD1D",ti:"Kredite & Zinsen",min:8,xp:80,cat:"Schulden",acc:R,
+   sl:["5.000\u20AC Kredit, 8%, 5 Jahre \u2192 du zahlst gesamt ca. 6.100\u20AC.",
+       {tip:"Vergleiche immer den effektiven Jahreszins (EAP) \u2013 er enth\u00e4lt alle Kosten."},
+       "Kreditkartenschulden: 15\u201324% Zinsen \u2013 einer der teuersten Kredite."],
+   q:{q:"Warum sind Kreditkartenschulden gef\u00e4hrlich?",o:["Unbegrenzt","Extrem hohe Zinsen 15\u201324%","Schaden SCHUFA","Banken f\u00f6rdern sie"],a:1}},
+  {id:15,ic:"\uD83C\uDFE0",ti:"Mieten oder Kaufen?",min:9,xp:90,cat:"Immobilien",acc:P,
+   sl:["Kaufpreis \u00f7 Jahreskaltmiete = Vervielf\u00e4ltiger. \u00dcber 35: Mieten oft g\u00fcnstiger.",
+       {tip:"M\u00fcnchen liegt bei 40\u201350. Kaufnebenkosten: bis zu 15% extra."}],
+   q:{q:"Ab welchem Vervielf\u00e4ltiger ist Mieten g\u00fcnstiger?",o:["\u00dcber 15","\u00dcber 20","\u00dcber 35","Immer"],a:2}},
+  {id:16,ic:"\uD83D\uDCBC",ti:"Altersvorsorge \u2013 3 S\u00e4ulen",min:11,xp:110,cat:"Vorsorge",acc:O,
+   sl:["S\u00e4ule 1: Gesetzl. Rente (~48% Netto). S\u00e4ule 2: bAV (15% AG-Zuschuss). S\u00e4ule 3: ETF, Riester.",
+       {tip:"bAV immer aussch\u00f6pfen \u2013 15% Arbeitgeberzuschuss ist quasi Gratisgeld!"}],
+   q:{q:"bAV Arbeitgeberzuschuss seit 2019?",o:["5%","10%","15%","25%"],a:2}},
+  {id:17,ic:"\uD83D\uDEE1\uFE0F",ti:"Berufsunf\u00e4higkeit absichern",min:9,xp:90,cat:"Vorsorge",acc:O,
+   sl:["Jeder 4. Arbeitnehmer wird vor der Rente berufsunf\u00e4hig. Staatl. Absicherung reicht nicht.",
+       {tip:"BU fr\u00fch abschlie\u00dfen: Mit 25 ca. 50\u201380\u20AC/Monat. Mit 40 doppelt so teuer."}],
+   q:{q:"Wie viele werden vor der Rente berufsunf\u00e4hig?",o:["Jeder 20.","Jeder 10.","Jeder 4.","Jeder 2."],a:2}},
+  {id:18,ic:"\uD83E\uDDE7",ti:"Welche Versicherungen brauche ich?",min:9,xp:85,cat:"Vorsorge",acc:O,
+   sl:["Pflicht: Privathaftpflicht, Berufsunf\u00e4higkeit, Krankenversicherung.",
+       {tip:"Privathaftpflicht: wichtigste Versicherung \u2013 kostet nur 50\u2013100\u20AC/Jahr."}],
+   q:{q:"Wichtigste Versicherung f\u00fcr Privatpersonen?",o:["Rechtsschutz","Privathaftpflicht","Hausrat","Reisekranken"],a:1}},
+  {id:19,ic:"\uD83E\uDDF2",ti:"Steuerkl\u00e4rung \u2013 Geld zur\u00fccholen",min:8,xp:85,cat:"Steuern",acc:T,
+   sl:["Freiwillig \u2013 aber fast immer lohnenswert. Durchschnittlich 1.051\u20AC Erstattung.",
+       {tip:"Absetzbar: Fahrtkosten (0,30\u20AC/km), Homeoffice (6\u20AC/Tag), Arbeitsmittel, Fortbildungen."}],
+   q:{q:"Durchschn. Erstattung Steuerkl\u00e4rung?",o:["~150\u20AC","~500\u20AC","~1.050\u20AC","~3.000\u20AC"],a:2}},
+  {id:20,ic:"\uD83D\uDCB9",ti:"Kapitalertragssteuer & Freibetrag",min:8,xp:80,cat:"Steuern",acc:T,
+   sl:["Gewinne aus ETFs/Aktien: 25% + Soli = ~26,4%.",
+       {tip:"Sparerpauschbetrag: 1.000\u20AC (Einzelperson) steuerfrei. Freistellungsauftrag einrichten!"}],
+   q:{q:"Sparerpauschbetrag Einzelperson?",o:["500\u20AC","801\u20AC","1.000\u20AC","2.000\u20AC"],a:2}},
+];
+
+var ECATS=[
+  {e:"\uD83C\uDFE0",l:"Wohnen"},{e:"\uD83D\uDED2",l:"Lebensmittel"},{e:"\uD83D\uDE97",l:"Transport"},
+  {e:"\uD83C\uDFAD",l:"Freizeit"},{e:"\uD83D\uDC8A",l:"Gesundheit"},{e:"\uD83D\uDCF1",l:"Digital"},
+  {e:"\uD83D\uDC57",l:"Kleidung"},{e:"\uD83D\uDCDA",l:"Bildung"},{e:"\u2708\uFE0F",l:"Urlaub"},{e:"\uD83D\uDD27",l:"Sonstiges"}
+];
+var CTPL=[
+  {id:1,e:"\uD83C\uDFE0",l:"Wohnen",budget:900,ex:[]},
+  {id:2,e:"\uD83D\uDED2",l:"Lebensmittel",budget:400,ex:[]},
+  {id:3,e:"\uD83D\uDE97",l:"Transport",budget:200,ex:[]},
+  {id:4,e:"\uD83C\uDFAD",l:"Freizeit",budget:150,ex:[]},
+  {id:5,e:"\uD83D\uDC8A",l:"Gesundheit",budget:80,ex:[]}
+];
+var AVATARS=["\uD83D\uDE0A","\uD83E\uDDD1","\uD83D\uDC69","\uD83E\uDDD4","\uD83D\uDC68\u200D\uD83D\uDCBC","\uD83D\uDC69\u200D\uD83D\uDCBC","\uD83E\uDDB8","\uD83E\uDDE0","\uD83D\uDCAA","\uD83C\uDF1F","\uD83C\uDFAF","\uD83D\uDE80"];
+
+// --- State ---
+var now=new Date();
+var ST={
+  page:"home",
+  dark:DB.g("mv_dark",true),
+  pro:DB.g("mv_pro",{name:"",av:"\uD83D\uDE0A"}),
+  done:DB.g("mv_done",[]),
+  xp:DB.g("mv_xp",0),
+  hb:DB.g("mv_hb",false),
+  md:DB.g("mv_md",null)||seed(),
+  goals:DB.g("mv_goals",[]),
+  sk:DB.g("mv_sk",{n:0,last:"",ice:0,onIce:false}),
+  cf:"Alle",
+  cy:now.getFullYear(),cm:now.getMonth(),
+  sc:null,sgf:false,
+  lesson:null,ls:0,qa:null,
+  msgs:[{r:"ai",t:"Hallo! Ich bin dein MoneyVision Coach \uD83D\uDCA1\n\nFrag mich alles zu Budgetierung, Sparen, Investieren, Schulden oder Steuern."}],
+  typ:false,
+  showAC:false,ncs:0,ncb:"",
+  inlId:null,inlV:"",
+  showAG:false,gn:"",gt:"",ge:"\uD83C\uDFAF",gadd:{}
+};
+
+function seed(){
+  var d={};
+  var sps=[[820,350,140,90,30],[780,290,160,130,60],[900,410,155,70,20]];
+  sps.forEach(function(sp,i){
+    var dt=new Date(now.getFullYear(),now.getMonth()-(2-i),1);
+    var key=mk(dt.getFullYear(),dt.getMonth());
+    d[key]={income:"2500",cats:CTPL.map(function(c,ci){
+      return {id:c.id,e:c.e,l:c.l,budget:c.budget,ex:sp[ci]>0?[{id:ci,nm:"Monatssumme",amt:sp[ci],rec:false}]:[]};
+    })};
+  });
+  return d;
+}
+
+function sv(){
+  DB.s("mv_dark",ST.dark);DB.s("mv_pro",ST.pro);
+  DB.s("mv_done",ST.done);DB.s("mv_xp",ST.xp);
+  DB.s("mv_hb",ST.hb);DB.s("mv_md",ST.md);
+  DB.s("mv_goals",ST.goals);DB.s("mv_sk",ST.sk);
+}
+function set(u){Object.assign(ST,u);sv();draw();}
+
+var fmt=function(n){return "\u20AC\u202f"+Number(n).toLocaleString("de-DE");};
+var mk=function(y,m){return y+"-"+(m+1<10?"0":"")+(m+1);};
+var mkey=function(){return mk(ST.cy,ST.cm);};
+var cd=function(){return ST.md[mkey()]||{income:"",cats:[]};};
+var cc=function(){return cd().cats||[];};
+var ci=function(){return Number(cd().income||0);};
+var ts=function(){return cc().reduce(function(s,b){return s+b.ex.reduce(function(a,e){return a+Number(e.amt);},0);},0);};
+
+function updM(u){var k=mkey();var e=ST.md[k]||{income:"",cats:[]};ST.md[k]=Object.assign({},e,u);sv();}
+function updC(fn){var k=mkey();var e=ST.md[k]||{income:"",cats:[]};ST.md[k]=Object.assign({},e,{cats:fn(e.cats||[])});sv();}
+
+function actBudget(){
+  var k=mkey();
+  if(!ST.md[k]||!ST.md[k].cats||ST.md[k].cats.length===0){
+    ST.md[k]={income:"2500",cats:CTPL.map(function(c){return {id:c.id,e:c.e,l:c.l,budget:c.budget,ex:[]};})};
+  }
+  ST.hb=true;sv();
+}
+
+function recAct(){
+  var t=new Date().toISOString().split("T")[0];
+  if(ST.sk.last===t)return;
+  ST.sk={n:ST.sk.onIce?ST.sk.n:ST.sk.n+1,last:t,ice:0,onIce:false};sv();
+}
+
+(function checkSk(){
+  var t=new Date().toISOString().split("T")[0];
+  var s=ST.sk;if(!s.last)return;
+  var diff=Math.round((new Date(t)-new Date(s.last))/86400000);
+  if(diff===0)return;
+  if(diff===1&&!s.onIce){var ic=s.ice+1;if(ic>=3)ST.sk={n:0,last:t,ice:0,onIce:false};else ST.sk=Object.assign({},s,{onIce:true,ice:ic});}
+  else ST.sk={n:0,last:t,ice:0,onIce:false};sv();
+})();
+
+function fsc(){
+  var s=0;if(ST.hb)s+=15;
+  var inc=ci(),sp=ts();
+  if(inc>0){if(sp/inc<0.8)s+=20;else if(sp/inc<1)s+=10;if((inc-sp)/inc>=0.2)s+=20;else if((inc-sp)/inc>=0.1)s+=10;}
+  else if(ST.hb)s+=15;
+  s+=Math.min(ST.done.length/CRS.length*20,20);
+  s+=Math.min(ST.sk.n/30*15,15);
+  if(ST.goals.length>0)s+=10;
+  return Math.round(Math.min(s,100));
+}
+
+function gicon(n){
+  n=(n||"").toLowerCase();
+  if(/miete|kalt/.test(n))return"\uD83C\uDFE0";
+  if(/strom|gas|neben/.test(n))return"\u26A1";
+  if(/wasser/.test(n))return"\uD83D\uDEBF";
+  if(/internet|wlan/.test(n))return"\uD83C\uDF10";
+  if(/netflix|disney|stream/.test(n))return"\uD83C\uDFAC";
+  if(/spotify|musik/.test(n))return"\uD83C\uDFB5";
+  if(/handy|telefon/.test(n))return"\uD83D\uDCF1";
+  if(/rewe|aldi|lidl|edeka|lebensmittel/.test(n))return"\uD83D\uDED2";
+  if(/restaurant|lieferando/.test(n))return"\uD83C\uDF7D\uFE0F";
+  if(/kaffee/.test(n))return"\u2615";
+  if(/benzin|tanken/.test(n))return"\u26FD";
+  if(/auto|kfz/.test(n))return"\uD83D\uDE97";
+  if(/versicherung/.test(n))return"\uD83D\uDEE1\uFE0F";
+  if(/arzt|doktor/.test(n))return"\uD83D\uDC68\u200D\u2695\uFE0F";
+  if(/apotheke|medikament/.test(n))return"\uD83D\uDC8A";
+  if(/gym|fitness/.test(n))return"\uD83D\uDCAA";
+  if(/kino|konzert/.test(n))return"\uD83C\uDFAD";
+  if(/urlaub|reise|flug/.test(n))return"\u2708\uFE0F";
+  return"\uD83D\uDCCC";
+}
+
+// --- DOM helpers ---
+function h(tag,attr,children){
+  var e=document.createElement(tag);
+  if(attr){
+    Object.keys(attr).forEach(function(k){
+      var v=attr[k];
+      if(k==="cls")e.className=v;
+      else if(k==="sty")Object.assign(e.style,v);
+      else if(k.substr(0,2)==="on")e.addEventListener(k.substr(2),v);
+      else e.setAttribute(k,v);
+    });
+  }
+  if(children){
+    [].concat(children).forEach(function(c){
+      if(c==null)return;
+      if(typeof c==="string"||typeof c==="number")e.appendChild(document.createTextNode(String(c)));
+      else e.appendChild(c);
+    });
+  }
+  return e;
+}
+function D(a,c){return h("div",a,c);}
+function S(a,c){return h("span",a,c);}
+function B(a,c){return h("button",a,c);}
+function I(a){return h("input",a);}
+
+function barEl(pct,col,ht){
+  ht=ht||6;
+  var w=D({sty:{height:ht+"px",background:"#2a2a40",borderRadius:"6px",overflow:"hidden"}});
+  w.appendChild(D({sty:{height:"100%",width:pct+"%",background:col,borderRadius:"6px",transition:"width .4s"}}));
+  return w;
+}
+function card(ch){var e=D({cls:"card"},ch);return e;}
+function lbl(t){return S({cls:"lbl"},t);}
+function rowEl(sty,ch){return D({sty:Object.assign({display:"flex"},sty)},ch);}
+
+// --- Nav ---
+function drawNav(){
+  var nav=document.getElementById("nav");nav.innerHTML="";
+  [{id:"home",e:"\uD83C\uDFE0",l:"Home"},{id:"courses",e:"\uD83D\uDCDA",l:"Kurse"},
+   {id:"budget",e:"\uD83D\uDCCA",l:"Budget"},{id:"history",e:"\uD83D\uDCC5",l:"Verlauf"},{id:"coach",e:"\uD83E\uDD16",l:"Coach"}]
+  .forEach(function(it){
+    var on=ST.page===it.id;
+    nav.appendChild(B({cls:"nb"+(on?" on":""),onclick:function(){set({page:it.id,sgf:false});}},
+      [S({cls:"ni"},it.e),it.l]));
+  });
+}
+
+// --- HOME ---
+function drawHome(){
+  var sc=fsc(),scCol=sc>=75?G:sc>=50?A:R;
+  var lvl=Math.floor(ST.xp/250)+1,lvlP=(ST.xp%250)/2.5;
+  var inc=ci(),sp=ts(),rem=inc-sp;
+  var f=document.createDocumentFragment();
+
+  // Header
+  var hdr=D({sty:{padding:"32px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
+    D(null,[D({sty:{fontSize:"13px",color:"#8888aa",marginBottom:"4px"}},"Willkommen zur\u00fcck,"),
+            D({sty:{fontSize:"28px",fontWeight:"900",letterSpacing:"-.5px"}},ST.pro.av+" "+(ST.pro.name||"Du"))]),
+    B({sty:{background:"#1e1e30",border:"none",borderRadius:"14px",padding:"8px 14px",cursor:"pointer",fontSize:"12px",color:"#8888aa",fontFamily:"inherit"},onclick:function(){set({page:"profile"});}},"\uD83D\uDC64 Profil")
+  ]);
+  f.appendChild(hdr);
+
+  // Ice warning
+  if(ST.sk.onIce){
+    f.appendChild(D({sty:{margin:"0 20px 16px",background:"rgba(91,143,255,.1)",border:"1px solid #5b8fff",borderRadius:"16px",padding:"14px",display:"flex",alignItems:"center",gap:"12px"}},[
+      S({sty:{fontSize:"28px"}},"\uD83E\uDDCA"),
+      D(null,[D({sty:{fontWeight:"800",fontSize:"14px",color:"#5b8fff"}},"Streak eingefroren!"),
+              D({sty:{fontSize:"12px",color:"#8888aa",marginTop:"2px"}},"Trag Ausgaben ein oder mach einen Kurs! ("+(3-ST.sk.ice)+" Rettung"+(3-ST.sk.ice!==1?"en":"")+" \u00fcbrig)")])
+    ]));
+  }
+
+  // Stats
+  var sr=D({sty:{display:"flex",gap:"8px",padding:"0 20px 20px",overflowX:"auto"}});
+  [{l:"Streak",v:(ST.sk.onIce?ST.sk.n+" \uD83E\uDDCA":ST.sk.n+" Tage"),i:ST.sk.onIce?"\uD83E\uDDCA":"\uD83D\uDD25"},
+   {l:"XP",v:ST.xp,i:"\u26A1"},{l:"Level",v:lvl,i:"\uD83C\uDFAF"},
+   {l:"Kurse",v:ST.done.length+"/"+CRS.length,i:"\uD83D\uDCDA"},
+   {l:"Score",v:sc,i:"\uD83D\uDCCA",c:scCol}].forEach(function(s){
+    var c=D({cls:"card",sty:{padding:"14px",minWidth:"78px",flexShrink:"0"}},[
+      D({sty:{fontSize:"20px",marginBottom:"5px"}},s.i),
+      D({sty:{fontSize:"16px",fontWeight:"900",color:s.c||"#eeeef8"}},String(s.v)),
+      D({sty:{fontSize:"10px",color:"#8888aa",marginTop:"2px"}},s.l)
+    ]);
+    sr.appendChild(c);
+  });
+  f.appendChild(sr);
+
+  // Level bar
+  var lb=D({cls:"card",sty:{margin:"0 20px 20px"}},[
+    rowEl({justifyContent:"space-between",fontSize:"13px",marginBottom:"10px",fontWeight:"600"},[
+      S(null,"Level "+lvl),S({sty:{color:"#8888aa",fontWeight:"400"}},(ST.xp%250)+"/250 XP")]),
+    barEl(lvlP,"linear-gradient(90deg,"+A+","+G+")",8)
+  ]);
+  f.appendChild(lb);
+
+  // Score card
+  var fscard=D({cls:"card",sty:{margin:"0 20px 20px",display:"flex",alignItems:"center",gap:"16px"}},[
+    D({sty:{width:"64px",height:"64px",borderRadius:"20px",background:scCol+"22",border:"2px solid "+scCol,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:"0"}},[
+      D({sty:{fontSize:"22px",fontWeight:"900",color:scCol}},String(sc))
+    ]),
+    D(null,[
+      D({sty:{fontWeight:"800",fontSize:"15px"}},"Finanz-Score"),
+      D({sty:{fontSize:"13px",color:"#8888aa",marginTop:"3px"}},sc>=75?"Ausgezeichnet \uD83C\uDF1F":sc>=50?"Gut \u2013 weiter so \uD83D\uDC4D":"Verbesserungspotential \uD83D\uDCAA"),
+      D({sty:{fontSize:"11px",color:"#44445a",marginTop:"4px"}},"Budget, Kurse, Ziele & Streak")
+    ])
+  ]);
+  f.appendChild(fscard);
+
+  // Budget widget
+  if(ST.hb&&cc().length>0){
+    var bw=D({sty:{padding:"0 20px 20px"}});
+    bw.appendChild(rowEl({justifyContent:"space-between",alignItems:"center",marginBottom:"10px"},[
+      lbl("BUDGET "+MONTHS[now.getMonth()].toUpperCase()),
+      B({sty:{background:"none",border:"none",color:A,fontSize:"12px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"},onclick:function(){set({page:"budget"});}},"Bearbeiten \u2192")
+    ]));
+    var bc=D({cls:"card"});
+    var smr=D({sty:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px",marginBottom:"14px"}});
+    [{l:"Einkommen",v:fmt(inc),c:G},{l:"Ausgaben",v:fmt(sp),c:R},{l:"\u00dcbrig",v:fmt(rem),c:rem>=0?A:R}]
+    .forEach(function(s){
+      smr.appendChild(D({sty:{textAlign:"center"}},[D({sty:{fontSize:"15px",fontWeight:"900",color:s.c}},s.v),D({sty:{fontSize:"11px",color:"#8888aa",marginTop:"2px"}},s.l)]));
+    });
+    bc.appendChild(smr);
+    cc().slice(0,4).forEach(function(b){
+      var sp2=b.ex.reduce(function(a,e){return a+Number(e.amt);},0);
+      var pct=Math.min(sp2/b.budget*100,100);var over=sp2>b.budget;
+      var br=D(null,[
+        rowEl({justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"},[
+          S({sty:{color:"#8888aa"}},b.e+" "+b.l),
+          S({sty:{color:over?R:"#8888aa",fontWeight:over?"700":"400"}},fmt(sp2)+"/"+fmt(b.budget))]),
+        barEl(pct,over?R:pct>80?A:G)
+      ]);
+      br.style.marginBottom="10px";
+      bc.appendChild(br);
+    });
+    bw.appendChild(bc);f.appendChild(bw);
+  } else if(!ST.hb){
+    var ct=D({sty:{padding:"0 20px 20px"}});
+    var cc2=D({cls:"card",sty:{background:"rgba(240,192,96,.1)",border:"1px solid "+A,textAlign:"center",padding:"24px"}},[
+      D({sty:{fontSize:"36px",marginBottom:"10px"}},"\uD83D\uDCCA"),
+      D({sty:{fontWeight:"800",fontSize:"16px",marginBottom:"6px"}},"Budget anlegen"),
+      D({sty:{fontSize:"13px",color:"#8888aa",lineHeight:"1.6",marginBottom:"16px"}},"Behalte deine Ausgaben im Blick."),
+      B({cls:"btn ba",onclick:function(){actBudget();set({page:"budget"});}},"\uD83D\uDCCA Budget jetzt einrichten")
+    ]);
+    ct.appendChild(cc2);f.appendChild(ct);
+  }
+
+  // Goals
+  if(ST.goals.length>0){
+    var gw=D({sty:{padding:"0 20px 20px"}});
+    gw.appendChild(rowEl({justifyContent:"space-between",alignItems:"center",marginBottom:"10px"},[
+      lbl("SPARZIELE"),
+      B({sty:{background:"none",border:"none",color:A,fontSize:"12px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"},onclick:function(){set({page:"budget",sgf:true});}},["Alle \u2192"])
+    ]));
+    ST.goals.slice(0,2).forEach(function(g){
+      var pct=Math.min(g.cur/g.tgt*100,100);var dn=g.cur>=g.tgt;
+      var gc=D({cls:"card"},[
+        rowEl({justifyContent:"space-between",marginBottom:"8px"},[
+          D({sty:{fontWeight:"700",fontSize:"14px"}},g.em+" "+g.nm),
+          D({sty:{fontWeight:"800",fontSize:"13px",color:dn?G:A}},fmt(g.cur)+"/"+fmt(g.tgt))]),
+        barEl(pct,dn?G:A,8)
+      ]);
+      if(dn)gc.appendChild(D({sty:{fontSize:"12px",color:G,fontWeight:"700",marginTop:"6px"}},"\uD83C\uDF89 Ziel erreicht!"));
+      gw.appendChild(gc);
+    });
+    f.appendChild(gw);
+  }
+
+  // Next courses
+  var cw=D({sty:{padding:"0 20px 20px"}});
+  cw.appendChild(rowEl({justifyContent:"space-between",alignItems:"center",marginBottom:"10px"},[
+    lbl("N\u00c4CHSTE KURSE"),
+    B({sty:{background:"none",border:"none",color:A,fontSize:"12px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit"},onclick:function(){set({page:"courses"});}},["Alle \u2192"])
+  ]));
+  CRS.filter(function(c){return ST.done.indexOf(c.id)<0;}).slice(0,3).forEach(function(c){
+    var el=D({cls:"card hov",sty:{display:"flex",alignItems:"center",gap:"14px",marginBottom:"8px",cursor:"pointer"},onclick:function(){openLesson(c);}},[
+      D({sty:{width:"46px",height:"46px",background:c.acc+"20",borderRadius:"14px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"24px",flexShrink:"0"}},c.ic),
+      D({sty:{flex:"1"}},[D({sty:{fontSize:"14px",fontWeight:"700"}},c.ti),D({sty:{fontSize:"12px",color:"#8888aa",marginTop:"3px"}},c.min+" Min \u00b7 "+c.xp+" XP")]),
+      D({sty:{color:"#44445a",fontSize:"16px"}},"\u203a")
+    ]);
+    cw.appendChild(el);
+  });
+  f.appendChild(cw);
+
+  // Tip
+  var tip=D({sty:{margin:"0 20px",background:"rgba(240,192,96,.1)",border:"1px solid "+A,borderRadius:"18px",padding:"18px"}},[
+    D({sty:{fontSize:"11px",fontWeight:"700",color:A,letterSpacing:"1px",marginBottom:"8px"}},"\uD83D\uDCA1 TIPP DES TAGES"),
+    D({sty:{fontSize:"14px",lineHeight:"1.7"}},"Weise am Zahltag sofort deinen Sparbetrag an \u2013 bevor du anfangst auszugeben.")
+  ]);
+  f.appendChild(tip);
+  return f;
+}
+
+// --- COURSES ---
+function drawCourses(){
+  var f=document.createDocumentFragment();
+  f.appendChild(pageHdr("Kurse \uD83D\uDCDA",ST.done.length+" von "+CRS.length+" abgeschlossen"));
+  var pw=D({sty:{margin:"0 20px 14px"}});pw.appendChild(barEl(ST.done.length/CRS.length*100,"linear-gradient(90deg,"+A+","+G+")",5));f.appendChild(pw);
+  var fw=D({sty:{display:"flex",gap:"8px",padding:"0 20px 18px",overflowX:"auto"}});
+  var cats=["Alle"];CRS.forEach(function(c){if(cats.indexOf(c.cat)<0)cats.push(c.cat);});
+  cats.forEach(function(cat){
+    var on=ST.cf===cat,col=CATCOL[cat]||A;
+    fw.appendChild(B({sty:{background:on?col:"#1e1e30",color:on?"#0d0d14":"#8888aa",border:"none",borderRadius:"20px",padding:"7px 16px",fontSize:"13px",fontWeight:"600",cursor:"pointer",whiteSpace:"nowrap",flexShrink:"0",fontFamily:"inherit"},onclick:function(){set({cf:cat});}},cat));
+  });
+  f.appendChild(fw);
+  var list=D({sty:{padding:"0 20px",display:"grid",gap:"8px"}});
+  (ST.cf==="Alle"?CRS:CRS.filter(function(c){return c.cat===ST.cf;})).forEach(function(c){
+    var dn=ST.done.indexOf(c.id)>=0,cc=CATCOL[c.cat]||"#8888aa";
+    var el=D({cls:"card hov",sty:{display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",opacity:dn?"0.65":"1",border:dn?"1px solid "+G:"1px solid #2a2a40"},onclick:function(){openLesson(c);}},[
+      D({sty:{width:"50px",height:"50px",background:c.acc+"20",borderRadius:"14px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"26px",flexShrink:"0"}},c.ic),
+      D({sty:{flex:"1",minWidth:"0"}},[
+        D({sty:{fontSize:"14px",fontWeight:"700"}},c.ti),
+        D({sty:{fontSize:"12px",color:"#8888aa",marginTop:"3px"}},c.min+" Min \u00b7 "+c.xp+" XP"),
+        S({sty:{marginTop:"5px",display:"inline-block",fontSize:"11px",fontWeight:"700",color:cc,background:cc+"22",padding:"2px 8px",borderRadius:"6px"}},c.cat)
+      ]),
+      D({sty:{color:dn?G:"#44445a",fontSize:"18px",flexShrink:"0"}},dn?"\u2713":"\u203a")
+    ]);
+    list.appendChild(el);
+  });
+  f.appendChild(list);return f;
+}
+
+// --- LESSON ---
+function openLesson(course){ST.lesson=course;ST.ls=0;ST.qa=null;drawLesson();document.getElementById("lsov").classList.add("open");}
+function closeLesson(){document.getElementById("lsov").classList.remove("open");ST.lesson=null;draw();}
+function drawLesson(){
+  var ov=document.getElementById("lsov");ov.innerHTML="";
+  var l=ST.lesson;if(!l)return;
+  var slides=l.sl||[];var total=slides.length+1;var step=ST.ls;var isQ=step>=slides.length;var cur=isQ?null:slides[step];
+  var pb=D({sty:{display:"flex",alignItems:"center",gap:"12px",padding:"20px 20px 0"}},[
+    B({sty:{background:"#1e1e30",border:"none",borderRadius:"10px",width:"36px",height:"36px",cursor:"pointer",fontSize:"16px",color:"#8888aa",fontFamily:"inherit"},onclick:closeLesson},"\u2190"),
+    D({sty:{flex:"1",height:"4px",background:"#2a2a40",borderRadius:"4px",overflow:"hidden"}},[D({sty:{height:"100%",width:(step/total*100)+"%",background:l.acc,borderRadius:"4px",transition:"width .3s"}})]),
+    S({sty:{fontSize:"12px",color:"#8888aa"}},Math.min(step+1,total)+"/"+total)
+  ]);
+  ov.appendChild(pb);
+  var body=D({sty:{padding:"30px 20px"},cls:"fade"},[
+    D({sty:{fontSize:"52px",textAlign:"center",marginBottom:"20px"}},l.ic),
+    D({sty:{fontSize:"20px",fontWeight:"800",textAlign:"center",marginBottom:"28px"}},l.ti)
+  ]);
+  if(!isQ&&cur!=null){
+    if(typeof cur==="string"){
+      var sd=D({cls:"card"},cur);sd.style.cssText+="font-size:15px;line-height:1.75;margin-bottom:20px;";body.appendChild(sd);
+    } else if(cur.tip){
+      body.appendChild(D({sty:{background:"rgba(240,192,96,.1)",border:"1px solid "+A+"44",borderRadius:"18px",padding:"18px",marginBottom:"20px"}},[
+        D({sty:{fontSize:"11px",fontWeight:"700",color:A,letterSpacing:"1px",marginBottom:"8px"}},"TIPP"),
+        D({sty:{fontSize:"15px",lineHeight:"1.75"}},cur.tip)
+      ]));
+    }
+    body.appendChild(B({cls:"btn ba",onclick:function(){ST.ls++;drawLesson();}},"Weiter \u2192"));
+  }
+  if(isQ&&l.q){
+    var qd=D({cls:"card"},"\uD83E\uDDE0 "+l.q.q);qd.style.cssText+="font-size:15px;font-weight:600;line-height:1.6;margin-bottom:16px;";body.appendChild(qd);
+    l.q.o.forEach(function(opt,i){
+      var bg="#1c1c2e",border="#2a2a40",color="#eeeef8";
+      if(ST.qa!=null){if(i===l.q.a){bg="rgba(62,207,142,.1)";border=G;color=G;}else if(i===ST.qa){bg="rgba(255,107,107,.1)";border=R;color=R;}}
+      var ob=B({sty:{display:"block",width:"100%",background:bg,border:"1.5px solid "+border,borderRadius:"12px",padding:"13px 16px",color:color,fontSize:"14px",cursor:ST.qa==null?"pointer":"default",textAlign:"left",marginBottom:"8px",fontFamily:"inherit",transition:"all .2s"},onclick:function(){
+        if(ST.qa!=null)return;ST.qa=i;
+        if(i===l.q.a&&ST.done.indexOf(l.id)<0){
+          setTimeout(function(){ST.done=[...ST.done,l.id];ST.xp+=l.xp;recAct();sv();closeLesson();},1000);
+        }else drawLesson();
+      }},opt);
+      body.appendChild(ob);
+    });
+    if(ST.qa!=null&&ST.qa===l.q.a)body.appendChild(D({sty:{textAlign:"center",color:G,fontWeight:"800",fontSize:"16px",marginTop:"12px"}},"\uD83C\uDF89 Richtig! +"+l.xp+" XP"));
+    if(ST.qa!=null&&ST.qa!==l.q.a)body.appendChild(B({cls:"btn bp",sty:{marginTop:"8px"},onclick:function(){ST.qa=null;drawLesson();}},"Nochmal versuchen"));
+  }
+  ov.appendChild(body);
+}
+
+// --- BUDGET ---
+function drawBudget(){
+  var f=document.createDocumentFragment();
+  f.appendChild(pageHdr("Budget \uD83D\uDCCA"));
+  var isCur=ST.cy===now.getFullYear()&&ST.cm===now.getMonth();
+  var mn=D({sty:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 20px 16px"}},[
+    B({sty:{background:"#1e1e30",border:"none",borderRadius:"10px",width:"36px",height:"36px",cursor:"pointer",fontSize:"18px",color:"#8888aa",fontFamily:"inherit"},onclick:function(){var y=ST.cy,m=ST.cm;if(m===0){m=11;y--;}else m--;set({cy:y,cm:m});}},"\u2039"),
+    D({sty:{textAlign:"center"}},[D({sty:{fontWeight:"800",fontSize:"16px"}},MONTHS[ST.cm]+" "+ST.cy),(isCur?D({sty:{fontSize:"11px",color:G,fontWeight:"700",marginTop:"2px"}},"\u25CF aktuell"):null)]),
+    B({sty:{background:"#1e1e30",border:"none",borderRadius:"10px",width:"36px",height:"36px",cursor:isCur?"not-allowed":"pointer",fontSize:"18px",color:isCur?"#44445a":"#8888aa",fontFamily:"inherit"},onclick:function(){if(isCur)return;var y=ST.cy,m=ST.cm;if(m===11){m=0;y++;}else m++;set({cy:y,cm:m});}},"\u203a")
+  ]);
+  f.appendChild(mn);
+  var tabs=D({sty:{display:"flex",gap:"8px",padding:"0 20px 18px"}});
+  [{v:false,l:"\uD83D\uDCB0 Kategorien"},{v:true,l:"\uD83D\uDCB8 Sparziele"}].forEach(function(t){
+    tabs.appendChild(B({sty:{background:ST.sgf===t.v?A:"#1e1e30",color:ST.sgf===t.v?"#0d0d14":"#8888aa",border:"none",borderRadius:"20px",padding:"7px 16px",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"},onclick:function(){set({sgf:t.v});}},t.l));
+  });
+  f.appendChild(tabs);
+  if(!ST.hb){
+    var cta=D({sty:{padding:"0 20px"}},D({cls:"card",sty:{background:"rgba(240,192,96,.1)",border:"1px solid "+A,textAlign:"center",padding:"32px"}},[
+      D({sty:{fontSize:"48px",marginBottom:"16px"}},"\uD83D\uDCCA"),
+      D({sty:{fontWeight:"800",fontSize:"18px",marginBottom:"8px"}},"Budget einrichten"),
+      D({sty:{fontSize:"14px",color:"#8888aa",lineHeight:"1.7",marginBottom:"24px"}},"Lege Einkommen und Kategorien fest."),
+      B({cls:"btn ba",onclick:function(){actBudget();set({});}},"\uD83D\uDE80 Jetzt Budget anlegen")
+    ]));
+    f.appendChild(cta);return f;
+  }
+  var wrap=D({sty:{padding:"0 20px"}});
+  if(!ST.sgf){
+    var inc=ci(),sp=ts(),rem=inc-sp;
+    var ic=D({cls:"card",sty:{marginBottom:"12px"}},[lbl("NETTO-EINKOMMEN / MONAT")]);
+    var ir=D({sty:{display:"flex",alignItems:"center",gap:"8px"}},[S({sty:{color:"#8888aa",fontSize:"22px",fontWeight:"700"}},"\u20AC")]);
+    var ii=I({type:"number",placeholder:"0",sty:{flex:"1",background:"none",border:"none",outline:"none",fontSize:"28px",fontWeight:"900",color:"#eeeef8",fontFamily:"inherit"}});
+    ii.value=cd().income||"";ii.addEventListener("input",function(){updM({income:ii.value});});
+    ir.appendChild(ii);ic.appendChild(ir);wrap.appendChild(ic);
+    var smr=D({sty:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"14px"}});
+    [{l:"Einkommen",v:fmt(inc),c:G},{l:"Ausgaben",v:fmt(sp),c:R},{l:"\u00dcbrig",v:fmt(rem),c:rem>=0?A:R}].forEach(function(s){
+      smr.appendChild(D({cls:"card",sty:{padding:"14px",textAlign:"center"}},[D({sty:{fontSize:"14px",fontWeight:"900",color:s.c}},s.v),D({sty:{fontSize:"11px",color:"#8888aa",marginTop:"3px"}},s.l)]));
+    });
+    wrap.appendChild(smr);
+    wrap.appendChild(lbl("KATEGORIEN \u2013 Tippen zum \u00d6ffnen"));
+    cc().forEach(function(b){
+      var sp2=b.ex.reduce(function(a,e){return a+Number(e.amt);},0);
+      var pct=Math.min(sp2/b.budget*100,100);var over=sp2>b.budget;
+      var bc=D({cls:"card",sty:{marginBottom:"8px"}});
+      var cr=D({sty:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}});
+      var cl=D({sty:{display:"flex",alignItems:"center",gap:"10px",cursor:"pointer",flex:"1"},onclick:function(){openCat(b.id);}},[S({sty:{fontSize:"24px"}},b.e),D(null,[D({sty:{fontWeight:"700",fontSize:"14px"}},b.l),D({sty:{fontSize:"12px",color:"#8888aa"}},b.ex.length+" Ausgabe"+(b.ex.length!==1?"n":""))])]);
+      cr.appendChild(cl);
+      var ri=D({sty:{textAlign:"right",flexShrink:"0"}});
+      ri.appendChild(D({sty:{fontWeight:"900",fontSize:"16px",color:over?R:"#eeeef8",cursor:"pointer"},onclick:function(){openCat(b.id);}},fmt(sp2)));
+      if(ST.inlId===b.id){
+        var ie=D({sty:{display:"flex",gap:"4px",marginTop:"4px"}});
+        var ii2=I({type:"number",sty:{width:"80px",padding:"4px 8px",fontSize:"12px",textAlign:"right",background:"#14141f",border:"1px solid #5b8fff",borderRadius:"6px",color:"#eeeef8",fontFamily:"inherit",outline:"none"}});
+        ii2.value=ST.inlV;ii2.addEventListener("input",function(e){ST.inlV=e.target.value;});
+        ii2.addEventListener("keydown",function(e){if(e.key==="Enter"){updC(function(cats){return cats.map(function(x){return x.id===b.id?Object.assign({},x,{budget:Number(ST.inlV)||x.budget}):x;});});set({inlId:null});}});
+        setTimeout(function(){ii2.focus();},50);
+        ie.appendChild(ii2);
+        ie.appendChild(B({sty:{background:G,border:"none",borderRadius:"6px",padding:"0 8px",cursor:"pointer",color:"#0d0d14",fontWeight:"800",fontSize:"12px",fontFamily:"inherit"},onclick:function(){updC(function(cats){return cats.map(function(x){return x.id===b.id?Object.assign({},x,{budget:Number(ST.inlV)||x.budget}):x;});});set({inlId:null});}},"\u2713"));
+        ie.addEventListener("click",function(e){e.stopPropagation();});
+        ri.appendChild(ie);
+      } else {
+        var editBtn=D({sty:{fontSize:"12px",color:"#5b8fff",cursor:"pointer",fontWeight:"600",marginTop:"2px"},onclick:function(e){e.stopPropagation();set({inlId:b.id,inlV:String(b.budget)});}},["von "+fmt(b.budget)+" \u270F\uFE0F"]);
+        ri.appendChild(editBtn);
+      }
+      cr.appendChild(ri);bc.appendChild(cr);
+      var bw=D({sty:{cursor:"pointer"},onclick:function(){openCat(b.id);}});
+      bw.appendChild(barEl(pct,over?R:pct>80?A:G));
+      if(over)bw.appendChild(D({sty:{fontSize:"11px",color:R,fontWeight:"700",marginTop:"5px"}},"\u26A0\uFE0F "+fmt(sp2-b.budget)+" \u00fcber Budget"));
+      bc.appendChild(bw);
+      bc.appendChild(B({sty:{background:"none",border:"none",color:"#44445a",fontSize:"11px",cursor:"pointer",marginTop:"8px",padding:"0",fontFamily:"inherit"},onclick:function(){updC(function(cats){return cats.filter(function(x){return x.id!==b.id;});});set({});}},["Entfernen \u00d7"]));
+      wrap.appendChild(bc);
+    });
+    wrap.appendChild(B({cls:"btn bp",sty:{marginBottom:"10px"},onclick:function(){set({showAC:!ST.showAC});}},ST.showAC?"Abbrechen":"+ Kategorie hinzuf\u00fcgen"));
+    if(ST.showAC){
+      var af=D({cls:"card",sty:{marginBottom:"10px"}},[lbl("KATEGORIE W\u00c4HLEN")]);
+      var catRow=D({sty:{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"12px"}});
+      ECATS.forEach(function(c,i){
+        var on=ST.ncs===i;
+        catRow.appendChild(B({sty:{background:on?"rgba(240,192,96,.1)":"#1e1e30",border:"1px solid "+(on?A:"transparent"),borderRadius:"10px",padding:"8px 10px",cursor:"pointer",fontSize:"20px",fontFamily:"inherit"},onclick:function(){set({ncs:i});}},c.e));
+      });
+      af.appendChild(catRow);
+      af.appendChild(D({sty:{fontWeight:"700",fontSize:"14px",marginBottom:"12px"}},ECATS[ST.ncs].e+" "+ECATS[ST.ncs].l));
+      var bi=I({type:"number",placeholder:"Monatliches Budget in \u20AC",cls:"inp"});bi.value=ST.ncb;bi.addEventListener("input",function(e){ST.ncb=e.target.value;});bi.style.marginBottom="12px";
+      af.appendChild(bi);
+      af.appendChild(B({cls:"btn ba",onclick:function(){if(!ST.ncb)return;var c=ECATS[ST.ncs];updC(function(cats){return[...cats,{id:Date.now(),e:c.e,l:c.l,budget:Number(ST.ncb),ex:[]}];});set({showAC:false,ncb:""});}},["Kategorie hinzuf\u00fcgen"]));
+      wrap.appendChild(af);
+    }
+    if(ci()>0){
+      var rem2=ci()-ts();var tgt=ci()*0.2;
+      wrap.appendChild(D({sty:{background:"rgba(62,207,142,.1)",border:"1px solid "+G,borderRadius:"18px",padding:"16px",marginBottom:"10px"}},[
+        D({sty:{fontSize:"11px",fontWeight:"700",color:G,letterSpacing:"1px",marginBottom:"6px"}},"\uD83D\uDCA1 SPARTIPP"),
+        D({sty:{fontSize:"13px",lineHeight:"1.6"}},["Sparquote: "+fmt(tgt)+"/Monat (20%-Regel). "+(rem2>=tgt?"Super \u2013 Zielbereich! \uD83C\uDF89":"Noch "+fmt(Math.max(0,tgt-rem2))+" bis zum Ziel.")])
+      ]));
+    }
+    wrap.appendChild(B({cls:"btn bp",sty:{marginBottom:"8px",color:G},onclick:function(){var csv="Kategorie,Ausgabe,Betrag\n";cc().forEach(function(b){b.ex.forEach(function(e){csv+='"'+b.l+'","'+e.nm+'",'+e.amt+"\n";});});var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="MoneyVision_"+mkey()+".csv";a.click();}},"\uD83D\uDCE4 CSV Export"));
+    wrap.appendChild(B({cls:"btn bp",sty:{marginBottom:"10px"},onclick:function(){if(confirm("Budget zur\u00fccksetzen?")){updM({income:"",cats:[]});set({hb:false,showAC:false});}}},["Budget zur\u00fccksetzen"]));
+  }
+  if(ST.sgf){
+    wrap.appendChild(lbl("SPARZIELE"));
+    ST.goals.forEach(function(g){
+      var pct=Math.min(g.cur/g.tgt*100,100);var dn=g.cur>=g.tgt;
+      var bw3=D({sty:{height:"10px",background:"#2a2a40",borderRadius:"8px",overflow:"hidden",marginBottom:"12px"}},[D({sty:{height:"100%",width:pct+"%",background:dn?G:A,borderRadius:"8px",transition:"width .4s"}})]);
+      var gc=D({cls:"card",sty:{marginBottom:"12px"}},[
+        rowEl({justifyContent:"space-between",alignItems:"flex-start",marginBottom:"10px"},[
+          D(null,[D({sty:{fontWeight:"800",fontSize:"16px"}},g.em+" "+g.nm),D({sty:{fontSize:"12px",color:"#8888aa",marginTop:"2px"}},fmt(g.cur)+" von "+fmt(g.tgt))]),
+          D({sty:{fontWeight:"900",fontSize:"16px",color:dn?G:A}},Math.round(pct)+"%")]),
+        bw3
+      ]);
+      if(dn){gc.appendChild(D({sty:{fontSize:"14px",color:G,fontWeight:"800",textAlign:"center"}},"\uD83C\uDF89 Ziel erreicht!"));}
+      else{
+        var ar=D({sty:{display:"flex",gap:"8px"}});
+        var ai=I({type:"number",placeholder:"Betrag hinzuf\u00fcgen \u20AC",cls:"inp",sty:{flex:"1",padding:"8px 12px",marginBottom:"0"}});
+        ai.value=ST.gadd[g.id]||"";ai.addEventListener("input",function(e){ST.gadd=Object.assign({},ST.gadd);ST.gadd[g.id]=e.target.value;});
+        var addGoalAmt=function(){var amt=Number(ST.gadd[g.id]||0);if(amt)set({goals:ST.goals.map(function(x){return x.id===g.id?Object.assign({},x,{cur:Math.min(x.cur+amt,x.tgt)}):x;}),gadd:Object.assign({},ST.gadd,{[g.id]:""})});};
+        ai.addEventListener("keydown",function(e){if(e.key==="Enter")addGoalAmt();});
+        ar.appendChild(ai);
+        ar.appendChild(B({sty:{background:G,border:"none",borderRadius:"10px",padding:"0 16px",cursor:"pointer",color:"#0d0d14",fontWeight:"800",fontSize:"14px",fontFamily:"inherit"},onclick:addGoalAmt},"+")); 
+        gc.appendChild(ar);
+      }
+      gc.appendChild(B({sty:{background:"none",border:"none",color:"#44445a",fontSize:"11px",cursor:"pointer",marginTop:"10px",padding:"0",fontFamily:"inherit"},onclick:function(){set({goals:ST.goals.filter(function(x){return x.id!==g.id;})});}},["Entfernen \u00d7"]));
+      wrap.appendChild(gc);
+    });
+    wrap.appendChild(B({cls:"btn bp",sty:{marginBottom:"10px"},onclick:function(){set({showAG:!ST.showAG});}},ST.showAG?"Abbrechen":"+ Sparziel anlegen"));
+    if(ST.showAG){
+      var agf=D({cls:"card",sty:{marginBottom:"10px"}},[lbl("NEUES SPARZIEL")]);
+      var er=D({sty:{display:"flex",gap:"8px",marginBottom:"10px",flexWrap:"wrap"}});
+      ["\uD83C\uDFAF","\u2708\uFE0F","\uD83D\uDE97","\uD83C\uDFE0","\uD83D\uDCBB","\uD83C\uDF93","\uD83D\uDC8D","\uD83C\uDFCB\uFE0F","\uD83D\uDCF1","\uD83C\uDF34"].forEach(function(e){
+        er.appendChild(B({sty:{background:ST.ge===e?"rgba(240,192,96,.1)":"#1e1e30",border:"1px solid "+(ST.ge===e?A:"transparent"),borderRadius:"10px",padding:"8px",cursor:"pointer",fontSize:"22px",fontFamily:"inherit"},onclick:function(){set({ge:e});}},e));
+      });
+      agf.appendChild(er);
+      var gni=I({placeholder:"Zielname (z.B. Urlaub Japan)",cls:"inp"});gni.value=ST.gn;gni.addEventListener("input",function(e){ST.gn=e.target.value;});
+      var gti=I({type:"number",placeholder:"Zielbetrag in \u20AC",cls:"inp"});gti.value=ST.gt;gti.addEventListener("input",function(e){ST.gt=e.target.value;});
+      agf.appendChild(gni);agf.appendChild(gti);
+      agf.appendChild(B({cls:"btn ba",onclick:function(){if(!ST.gn||!ST.gt)return;set({goals:[...ST.goals,{id:Date.now(),nm:ST.gn,tgt:Number(ST.gt),cur:0,em:ST.ge}],showAG:false,gn:"",gt:""});}},["Sparziel anlegen"]));
+      wrap.appendChild(agf);
+    }
+  }
+  f.appendChild(wrap);return f;
+}
+
+// --- CAT DETAIL ---
+function openCat(id){ST.sc=id;drawCat();document.getElementById("catov").classList.add("open");}
+function closeCat(){document.getElementById("catov").classList.remove("open");ST.sc=null;draw();}
+function drawCat(){
+  var ov=document.getElementById("catov");ov.innerHTML="";
+  var b=cc().find(function(x){return x.id===ST.sc;});if(!b){closeCat();return;}
+  var sp=b.ex.reduce(function(a,e){return a+Number(e.amt);},0);
+  var pct=Math.min(sp/b.budget*100,100);var over=sp>b.budget;
+  ov.appendChild(D({sty:{display:"flex",alignItems:"center",gap:"12px",padding:"20px 20px 0"}},[
+    B({sty:{background:"#1e1e30",border:"none",borderRadius:"10px",width:"36px",height:"36px",cursor:"pointer",fontSize:"16px",color:"#8888aa",fontFamily:"inherit"},onclick:closeCat},"\u2190"),
+    D(null,[D({sty:{fontSize:"20px",fontWeight:"900"}},b.e+" "+b.l),D({sty:{fontSize:"12px",color:"#8888aa"}},MONTHS[ST.cm]+" "+ST.cy)])
+  ]));
+  var body=D({sty:{padding:"20px"}});
+  var sc2=D({cls:"card",sty:{marginBottom:"16px"}});
+  var sr=D({sty:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px",marginBottom:"14px"}});
+  [{l:"Budget \u270F\uFE0F",v:fmt(b.budget),c:B,click:true},{l:"Ausgaben",v:fmt(sp),c:over?R:"#eeeef8"},{l:"\u00dcbrig",v:fmt(b.budget-sp),c:over?R:G}]
+  .forEach(function(s,i){
+    var sd=D({sty:{textAlign:"center",cursor:s.click?"pointer":"default"}},[D({sty:{fontSize:"15px",fontWeight:"900",color:s.c}},s.v),D({sty:{fontSize:"11px",color:s.c,marginTop:"2px",fontWeight:s.click?"600":"400"}},s.l)]);
+    if(s.click)sd.addEventListener("click",function(){set({inlId:b.id,inlV:String(b.budget)});});
+    sr.appendChild(sd);
+  });
+  sc2.appendChild(sr);sc2.appendChild(barEl(pct,over?R:pct>80?A:G,8));
+  sc2.appendChild(rowEl({justifyContent:"space-between",fontSize:"11px",marginTop:"6px"},[S({sty:{color:"#8888aa"}},Math.round(pct)+"% verbraucht"),S({sty:{color:over?R:G,fontWeight:over?"700":"400"}},over?"\u26A0\uFE0F "+fmt(sp-b.budget)+" \u00fcber Budget":fmt(b.budget-sp)+" verbleibend")]));
+  body.appendChild(sc2);
+  var af=D({sty:{background:"rgba(240,192,96,.1)",border:"1px solid "+A+"44",borderRadius:"18px",padding:"18px",marginBottom:"16px"}},[lbl("AUSGABE HINZUF\u00dcGEN")]);
+  var ar=D({sty:{display:"flex",gap:"8px",marginBottom:"8px"}});
+  var ni=I({placeholder:"z.B. Miete, Strom\u2026",cls:"inp",sty:{flex:"2",color:A,marginBottom:"0"}});
+  var ai2=I({type:"number",placeholder:"\u20AC",cls:"inp",sty:{flex:"1",color:G,fontWeight:"700",marginBottom:"0"}});
+  var addB=B({sty:{background:A,border:"none",borderRadius:"12px",width:"44px",height:"44px",cursor:"pointer",fontSize:"22px",color:"#0d0d14",fontWeight:"900",flexShrink:"0",fontFamily:"inherit"},onclick:function(){
+    if(!ni.value||!ai2.value)return;
+    var rec=ov.querySelector("#reccb")&&ov.querySelector("#reccb").checked;
+    updC(function(cats){return cats.map(function(x){return x.id===b.id?Object.assign({},x,{ex:[...x.ex,{id:Date.now(),nm:ni.value,amt:Number(ai2.value),rec:!!rec}]}):x;});});
+    ni.value="";ai2.value="";recAct();sv();drawCat();
+  }},"+");
+  ar.appendChild(ni);ar.appendChild(ai2);ar.appendChild(addB);af.appendChild(ar);
+  var rr=D({sty:{display:"flex",alignItems:"center",gap:"8px"}},[h("input",{type:"checkbox",id:"reccb",sty:{width:"16px",height:"16px"}}),S({sty:{fontSize:"12px",color:"#8888aa"}},"\uD83D\uDD01 Als Dauerauftrag markieren")]);
+  af.appendChild(rr);body.appendChild(af);
+  if(b.ex.length===0){
+    body.appendChild(D({sty:{textAlign:"center",color:"#44445a",fontSize:"14px",padding:"30px 0"}},[D({sty:{fontSize:"40px",marginBottom:"10px"}},"\uD83D\uDCED"),"Noch keine Ausgaben eingetragen."]));
+  } else {
+    body.appendChild(lbl("ALLE AUSGABEN ("+b.ex.length+")"));
+    b.ex.slice().reverse().forEach(function(exp){
+      var ec=D({cls:"card",sty:{display:"flex",alignItems:"center",gap:"12px",padding:"12px 16px",marginBottom:"8px"}},[
+        D({sty:{width:"38px",height:"38px",background:"#1e1e30",borderRadius:"10px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px",flexShrink:"0"}},gicon(exp.nm)),
+        D({sty:{flex:"1"}},[D({sty:{fontSize:"14px",fontWeight:"600",color:A}},exp.nm),(exp.rec?D({sty:{fontSize:"11px",color:B,marginTop:"2px"}},"\uD83D\uDD01 Dauerauftrag"):null)]),
+        D({sty:{fontWeight:"900",fontSize:"15px",color:"#eeeef8",marginRight:"8px"}},fmt(exp.amt)),
+        B({sty:{background:"none",border:"none",color:"#44445a",fontSize:"20px",cursor:"pointer",padding:"0 4px",fontFamily:"inherit"},onclick:function(){updC(function(cats){return cats.map(function(x){return x.id===b.id?Object.assign({},x,{ex:x.ex.filter(function(e){return e.id!==exp.id;})}):x;});});sv();drawCat();}},["\u00d7"])
+      ]);
+      body.appendChild(ec);
+    });
+    body.appendChild(rowEl({justifyContent:"space-between",background:"#14141f",borderRadius:"14px",padding:"14px 18px",marginTop:"4px"},[S({sty:{fontWeight:"700",color:"#8888aa",fontSize:"14px"}},"Gesamt"),S({sty:{fontWeight:"900",fontSize:"18px",color:over?R:A}},fmt(sp))]));
+  }
+  ov.appendChild(body);
+}
+
+// --- HISTORY ---
+function drawHistory(){
+  var months=[];
+  for(var i=5;i>=0;i--){
+    var dt2=new Date(now.getFullYear(),now.getMonth()-i,1);
+    var key=mk(dt2.getFullYear(),dt2.getMonth());
+    var data=ST.md[key];
+    var spent=data&&Array.isArray(data.cats)?data.cats.reduce(function(s,b){return s+(Array.isArray(b.ex)?b.ex.reduce(function(a,e){return a+Number(e.amt);},0):0);},0):0;
+    months.push({key:key,label:MONTHS[dt2.getMonth()].slice(0,3),month:dt2.getMonth(),year:dt2.getFullYear(),spent:spent,income:data?Number(data.income||0):0});
+  }
+  var maxS=Math.max.apply(null,months.map(function(m){return m.spent;}).concat([1]));
+  var f=document.createDocumentFragment();
+  f.appendChild(pageHdr("Verlauf \uD83D\uDCC5","Letzte 6 Monate"));
+  var bc=D({cls:"card",sty:{margin:"0 20px 20px"}},[lbl("MONATLICHE AUSGABEN")]);
+  var bars=D({sty:{display:"flex",alignItems:"flex-end",gap:"8px",height:"130px",marginBottom:"12px"}});
+  months.forEach(function(m){
+    var isNow=m.key===mk(now.getFullYear(),now.getMonth());
+    var bh=maxS>0?Math.max(Math.round(m.spent/maxS*110),m.spent>0?6:3):3;
+    var col2=D({sty:{flex:"1",display:"flex",flexDirection:"column",alignItems:"center",gap:"5px"}},[
+      D({sty:{fontSize:"9px",color:isNow?A:"#8888aa",fontWeight:"700",textAlign:"center",minHeight:"14px"}},m.spent>0?(m.spent>=1000?(m.spent/1000).toFixed(1)+"k":String(Math.round(m.spent))):"-"),
+      D({sty:{width:"100%",height:bh+"px",background:isNow?A:B,borderRadius:"5px 5px 0 0",opacity:isNow?"1":"0.55"}}),
+      D({sty:{fontSize:"10px",color:isNow?A:"#8888aa",fontWeight:isNow?"800":"400"}},m.label)
+    ]);
+    bars.appendChild(col2);
+  });
+  bc.appendChild(bars);
+  bc.appendChild(rowEl({justifyContent:"space-between",fontSize:"12px",paddingTop:"10px",borderTop:"1px solid #2a2a40"},[
+    S({sty:{color:"#8888aa"}},"Gold = aktueller Monat"),
+    S({sty:{fontWeight:"700"}},"\u03a3 "+fmt(months.reduce(function(s,m){return s+m.spent;},0)))
+  ]));
+  f.appendChild(bc);
+  var list=D({sty:{padding:"0 20px"}});
+  list.appendChild(lbl("MONATSDETAILS \u2013 Tippen zum \u00d6ffnen"));
+  months.slice().reverse().forEach(function(m){
+    var isNow=m.key===mk(now.getFullYear(),now.getMonth());
+    var saved=m.income-m.spent;
+    var spPct=m.income>0?Math.min(Math.round(m.spent/m.income*100),100):0;
+    var data=ST.md[m.key];
+    var mc=D({cls:"card hov",sty:{marginBottom:"10px",cursor:"pointer",border:isNow?"1.5px solid "+A:"1px solid #2a2a40"},onclick:function(){set({cy:m.year,cm:m.month,page:"budget",sgf:false});}});
+    var mr=rowEl({justifyContent:"space-between",alignItems:"flex-start",marginBottom:"10px"});
+    var ml=D(null);
+    var mt=D({sty:{fontWeight:"800",fontSize:"15px",display:"flex",alignItems:"center",gap:"8px"}},[MONTHS[m.month]+" "+m.year]);
+    if(isNow)mt.appendChild(S({sty:{fontSize:"10px",color:G,fontWeight:"700",background:"rgba(62,207,142,.1)",padding:"2px 8px",borderRadius:"8px"}},"\u25CF aktuell"));
+    ml.appendChild(mt);ml.appendChild(D({sty:{fontSize:"12px",color:"#8888aa",marginTop:"3px"}},m.income>0?"Einkommen: "+fmt(m.income):"Kein Einkommen angegeben"));
+    var ri=D({sty:{textAlign:"right"}},[D({sty:{fontWeight:"900",fontSize:"16px",color:R}},fmt(m.spent))]);
+    if(m.income>0)ri.appendChild(D({sty:{fontSize:"11px",fontWeight:"700",marginTop:"2px",color:saved>=0?G:R}},(saved>=0?"+ ":"")+fmt(saved)+" gespart"));
+    mr.appendChild(ml);mr.appendChild(ri);mc.appendChild(mr);
+    if(m.income>0){
+      var brow=D(null,[rowEl({justifyContent:"space-between",fontSize:"11px",color:"#8888aa",marginBottom:"5px"},[S(null,"Ausgaben"),S(null,spPct+"%")]),barEl(spPct,m.spent>m.income?R:spPct>80?A:B)]);
+      brow.style.marginBottom="10px";mc.appendChild(brow);
+    }
+    if(data&&data.cats&&data.cats.some(function(b){return b.ex.length>0;})){
+      var pills=D({sty:{display:"flex",gap:"6px",flexWrap:"wrap"}});
+      data.cats.filter(function(b){return b.ex.length>0;}).forEach(function(b){
+        var sp3=b.ex.reduce(function(a,e){return a+Number(e.amt);},0);
+        pills.appendChild(S({sty:{fontSize:"11px",color:"#8888aa",background:"#1e1e30",borderRadius:"8px",padding:"3px 8px"}},b.e+" "+fmt(sp3)));
+      });
+      mc.appendChild(pills);
+    }
+    if(!data)mc.appendChild(D({sty:{fontSize:"12px",color:"#44445a",fontStyle:"italic"}},"Noch keine Daten \u2013 tippen um Budget zu erfassen"));
+    list.appendChild(mc);
+  });
+  f.appendChild(list);return f;
+}
+
+// --- PROFILE ---
+function drawProfile(){
+  var f=document.createDocumentFragment();
+  var lvl=Math.floor(ST.xp/250)+1,lvlP=(ST.xp%250)/2.5;
+  var sc=fsc(),scCol=sc>=75?G:sc>=50?A:R;
+  var hdr=D({sty:{padding:"28px 20px 20px",display:"flex",alignItems:"center",gap:"12px"}},[
+    B({sty:{background:"#1e1e30",border:"none",borderRadius:"10px",width:"36px",height:"36px",cursor:"pointer",fontSize:"16px",color:"#8888aa",fontFamily:"inherit"},onclick:function(){set({page:"home"});}},"\u2190"),
+    D({sty:{fontSize:"22px",fontWeight:"900",letterSpacing:"-.5px"}},"Profil \uD83D\uDC64")
+  ]);
+  f.appendChild(hdr);
+  var ac=D({cls:"card",sty:{margin:"0 20px 16px",textAlign:"center",padding:"28px"}},[
+    D({sty:{fontSize:"64px",marginBottom:"16px"}},ST.pro.av),
+    D({sty:{fontSize:"22px",fontWeight:"900",marginBottom:"4px"}},ST.pro.name||"Du"),
+    D({sty:{fontSize:"13px",color:"#8888aa",marginBottom:"20px"}},"Level "+lvl+" \u00b7 "+ST.xp+" XP \u00b7 Score "+sc)
+  ]);
+  ac.appendChild(lbl("AVATAR W\u00c4HLEN"));
+  var avRow=D({sty:{display:"flex",flexWrap:"wrap",gap:"8px",justifyContent:"center",marginBottom:"16px"}});
+  AVATARS.forEach(function(a){
+    avRow.appendChild(B({sty:{fontSize:"28px",background:ST.pro.av===a?"rgba(240,192,96,.1)":"#1e1e30",border:"1.5px solid "+(ST.pro.av===a?A:"transparent"),borderRadius:"12px",padding:"8px",cursor:"pointer",fontFamily:"inherit"},onclick:function(){ST.pro=Object.assign({},ST.pro,{av:a});sv();draw();}},a));
+  });
+  ac.appendChild(avRow);
+  var ni=I({placeholder:"Dein Name",cls:"inp",sty:{textAlign:"center",fontSize:"16px",fontWeight:"700"}});
+  ni.value=ST.pro.name;ni.addEventListener("input",function(e){ST.pro=Object.assign({},ST.pro,{name:e.target.value});sv();});
+  ac.appendChild(ni);f.appendChild(ac);
+  var wrap=D({sty:{padding:"0 20px"}});
+
+  // Dark mode toggle
+  wrap.appendChild(lbl("EINSTELLUNGEN"));
+  var sw=D({cls:"card",sty:{marginBottom:"12px"}});
+  sw.appendChild(rowEl({justifyContent:"space-between",alignItems:"center",marginBottom:"14px"},[
+    D(null,[D({sty:{fontWeight:"700",fontSize:"14px"}},"\uD83C\uDF19 Dark Mode"),D({sty:{fontSize:"12px",color:"#8888aa"}},"Dunkles oder helles Design")]),
+    B({sty:{background:"#1e1e30",border:"none",borderRadius:"20px",padding:"8px 18px",cursor:"pointer",fontWeight:"700",fontSize:"13px",color:"#8888aa",fontFamily:"inherit"},onclick:function(){alert("Dark Mode: In der lokalen Version ist nur Dark Mode verf\u00fcgbar.");}},"\uD83C\uDF19 Dark")
+  ]));
+  wrap.appendChild(sw);
+
+  // Stats
+  wrap.appendChild(lbl("STATISTIKEN"));
+  var sg=D({sty:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"16px"}});
+  [{l:"Kurse",v:ST.done.length+"/"+CRS.length,i:"\uD83D\uDCDA",c:B},{l:"XP gesamt",v:ST.xp,i:"\u26A1",c:A},{l:"Level",v:lvl,i:"\uD83C\uDFAF",c:G},{l:"Streak",v:ST.sk.n+" Tage",i:ST.sk.onIce?"\uD83E\uDDCA":"\uD83D\uDD25",c:ST.sk.onIce?B:O}]
+  .forEach(function(s){
+    sg.appendChild(D({cls:"card",sty:{padding:"16px"}},[D({sty:{fontSize:"24px",marginBottom:"8px"}},s.i),D({sty:{fontSize:"18px",fontWeight:"900",color:s.c}},String(s.v)),D({sty:{fontSize:"12px",color:"#8888aa",marginTop:"2px"}},s.l)]));
+  });
+  wrap.appendChild(sg);
+  var lp=D({cls:"card",sty:{marginBottom:"16px"}},[
+    rowEl({justifyContent:"space-between",fontSize:"13px",marginBottom:"10px",fontWeight:"600"},[S(null,"Level "+lvl+" \u2192 "+(lvl+1)),S({sty:{color:"#8888aa",fontWeight:"400"}},(ST.xp%250)+"/250 XP")]),
+    barEl(lvlP,"linear-gradient(90deg,"+A+","+G+")",10),
+    D({sty:{fontSize:"12px",color:"#8888aa",marginTop:"8px"}},"Noch "+(250-(ST.xp%250))+" XP bis Level "+(lvl+1))
+  ]);
+  wrap.appendChild(lp);
+  wrap.appendChild(B({cls:"btn bp",sty:{color:R},onclick:function(){if(confirm("Alle Daten wirklich l\u00f6schen?")){ST.done=[];ST.xp=0;ST.md=seed();ST.hb=false;ST.pro={name:"",av:"\uD83D\uDE0A"};ST.goals=[];ST.sk={n:0,last:"",ice:0,onIce:false};sv();draw();}}},"Alle Daten zur\u00fccksetzen"));
+  f.appendChild(wrap);return f;
+}
+
+// --- COACH ---
+function openCoach(){drawCoach();document.getElementById("cov").classList.add("open");}
+function drawCoach(){
+  var ov=document.getElementById("cov");ov.innerHTML="";
+  ov.appendChild(D({sty:{padding:"28px 20px 12px",display:"flex",justifyContent:"space-between",flexShrink:"0"}},[
+    D(null,[D({sty:{fontSize:"24px",fontWeight:"900",letterSpacing:"-.5px"}},"Coach \uD83E\uDD16"),D({sty:{fontSize:"13px",color:"#8888aa",marginTop:"3px"}},"KI-Finanzberater")]),
+    D({sty:{fontSize:"11px",color:"#44445a",fontWeight:"700",paddingTop:"6px"}},"MoneyVision")
+  ]));
+  var msgs=D({sty:{flex:"1",overflowY:"auto",padding:"0 16px 8px",display:"flex",flexDirection:"column",gap:"10px"}});
+  ST.msgs.forEach(function(m){
+    var row2=D({sty:{display:"flex",justifyContent:m.r==="user"?"flex-end":"flex-start",alignItems:"flex-end",gap:"8px"}});
+    if(m.r==="ai")row2.appendChild(S({sty:{fontSize:"22px",flexShrink:"0"}},"\uD83E\uDD16"));
+    row2.appendChild(D({cls:m.r==="user"?"buser":"bai"},m.t));
+    msgs.appendChild(row2);
+  });
+  if(ST.typ){
+    var tr=D({sty:{display:"flex",alignItems:"flex-end",gap:"8px"}});
+    tr.appendChild(S({sty:{fontSize:"22px"}},"\uD83E\uDD16"));
+    var tb=D({cls:"bai",sty:{display:"flex",gap:"5px",alignItems:"center"}});
+    [0,1,2].forEach(function(i){var d=D({cls:"dot",sty:{animationDelay:i*0.18+"s"}});tb.appendChild(d);});
+    tr.appendChild(tb);msgs.appendChild(tr);
+  }
+  var anch=D(null);msgs.appendChild(anch);
+  ov.appendChild(msgs);
+  setTimeout(function(){anch.scrollIntoView({behavior:"smooth"});},50);
+  var qs=D({sty:{padding:"6px 16px",display:"flex",gap:"8px",overflowX:"auto",flexShrink:"0"}});
+  ["ETF Sparplan","Notgroschen","Schulden abbauen","Steuer sparen","Rente aufbauen"].forEach(function(q){
+    qs.appendChild(B({sty:{background:"#1e1e30",border:"none",borderRadius:"20px",padding:"7px 14px",color:"#8888aa",fontSize:"12px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",flexShrink:"0"},onclick:function(){var ci=document.getElementById("ci");if(ci)ci.value=q;}},q));
+  });
+  ov.appendChild(qs);
+  var ir=D({sty:{padding:"10px 16px 90px",flexShrink:"0",display:"flex",gap:"8px"}});
+  var ci=I({id:"ci",placeholder:"Stell deine Finanzfrage\u2026",cls:"inp",sty:{flex:"1",borderRadius:"14px",marginBottom:"0"}});
+  ci.addEventListener("keydown",function(e){if(e.key==="Enter")sendChat();});
+  ir.appendChild(ci);
+  ir.appendChild(B({sty:{background:A,border:"none",borderRadius:"14px",width:"46px",height:"46px",cursor:"pointer",fontSize:"20px",color:"#0d0d14",flexShrink:"0",fontFamily:"inherit"},onclick:sendChat},"\u2191"));
+  ov.appendChild(ir);
+}
+
+async function sendChat(){
+  var ci=document.getElementById("ci");if(!ci||!ci.value.trim()||ST.typ)return;
+  var text=ci.value.trim();ci.value="";
+  var key=localStorage.getItem("mv_ak")||"";
+  if(!key){document.getElementById("apib").style.display="block";return;}
+  ST.msgs=[...ST.msgs,{r:"user",t:text}];ST.typ=true;drawCoach();
+  try{
+    var msgs2=ST.msgs.map(function(m){return{role:m.r==="user"?"user":"assistant",content:m.t};});
+    var res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
+      body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,
+        system:"Du bist MoneyVision Coach, freundlicher Finanzberater f\u00fcr D/A/CH. Beantworte Fragen zu Budgetierung, Sparen, Investieren, Schulden, Altersvorsorge und Steuern. Deutsch, konkret, max. 4 S\u00e4tze.",
+        messages:msgs2})
+    });
+    var data=await res.json();
+    ST.msgs=[...ST.msgs,{r:"ai",t:data.content&&data.content[0]?data.content[0].text:"Fehler."}];
+  }catch(e){ST.msgs=[...ST.msgs,{r:"ai",t:"Verbindungsfehler. Bitte erneut versuchen."}];}
+  ST.typ=false;drawCoach();
+}
+
+// --- UTILS ---
+function pageHdr(title,sub){
+  return D({sty:{padding:"28px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
+    D(null,[D({sty:{fontSize:"24px",fontWeight:"900",letterSpacing:"-.5px"}},title),(sub?D({sty:{fontSize:"13px",color:"#8888aa",marginTop:"3px"}},sub):null)]),
+    D({sty:{fontSize:"11px",color:"#44445a",fontWeight:"700",paddingTop:"6px"}},"MoneyVision")
+  ]);
+}
+
+// --- MAIN DRAW ---
+function draw(){
+  var wrap=document.getElementById("app");wrap.innerHTML="";
+  document.getElementById("lsov").classList.remove("open");
+  document.getElementById("catov").classList.remove("open");
+  document.getElementById("cov").classList.remove("open");
+  var content=null;
+  if(ST.page==="home")content=drawHome();
+  else if(ST.page==="courses")content=drawCourses();
+  else if(ST.page==="budget")content=drawBudget();
+  else if(ST.page==="history")content=drawHistory();
+  else if(ST.page==="profile")content=drawProfile();
+  else if(ST.page==="coach"){drawNav();openCoach();return;}
+  if(content)wrap.appendChild(content);
+  drawNav();
+}
+
+// API banner
+function saveKey(){var k=document.getElementById("api-inp").value.trim();if(k.length>10){localStorage.setItem("mv_ak",k);document.getElementById("apib").style.display="none";}else alert("Bitte g\u00fcltigen API Key eingeben.");}
+
+draw();
+</script>
+<div id="apib" style="position:fixed;bottom:86px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:440px;background:#1c1c2e;border:1px solid rgba(240,192,96,.4);border-radius:16px;padding:14px 16px;z-index:200;display:none;">
+  <p style="font-size:13px;color:#8888aa;margin-bottom:8px;line-height:1.5;">&#x1F916; Gib deinen Anthropic API Key ein – wird nur lokal gespeichert.</p>
+  <input id="api-inp" type="password" placeholder="sk-ant-..." style="width:100%;background:#0d0d14;border:1px solid #2a2a40;border-radius:10px;padding:10px 12px;color:#eeeef8;font-size:13px;outline:none;margin-bottom:8px;font-family:inherit;"/>
+  <button onclick="saveKey()" style="background:#f0c060;border:none;border-radius:10px;padding:9px 18px;font-weight:800;cursor:pointer;font-size:13px;color:#0d0d14;font-family:inherit;">Speichern</button>
+</div>
+</body>
+</html>
